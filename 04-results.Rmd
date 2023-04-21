@@ -1,1 +1,232 @@
+
+---
+title: "Download USGS Data"
+author: "Eric Williams"
+date: "2023-02-16"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 # Results
+Dont hit knit, you want to do render_book() to KNIT ENTIRE BOOK, but you
+
+```{r}
+source('setup.R')
+library(dataRetrieval)
+library(tidyr)
+library(lubridate)
+```
+
+Let's make some hydrographs of a few decades' worth of data for the Poudre River at Lincoln and Boxelder. That is the broadest context. After I do that, I will make some regime curves for Q, P, and any other variables that impact DO concentrations in the water. These regime curves will be for the whole year and hopefully averages of the aformentioned data or during the same time range (if possible). 
+
+# full year
+```{r}
+# get data for each site 
+lincoln_Q <- readNWISdv('06752260', parameterCd = '00060', startDate = '1990-10-01', endDate = '2022-10-01') %>%
+  rename(q = X_00060_00003) %>%
+  rename(q_cd = X_00060_00003_cd) %>%
+  mutate(site = 'lincoln')
+boxelder_Q <- readNWISdv('06752280', parameterCd = '00060', startDate = '1990-10-01', endDate = '2022-10-01') %>%
+   rename(q = X_00060_00003) %>%
+  rename(q_cd = X_00060_00003_cd) %>%
+  mutate(site = 'boxelder_elc')
+combined_sites <- bind_rows(boxelder_Q, lincoln_Q)
+summary(combined_sites)
+```
+
+
+Get the median streamflow for each day of the year for the data frames of streamflow that already have my 1990 to 2023 data
+```{r, _R_USE_PIPEBIND_ = T}
+median_Q <- combined_sites %>%
+ # mutate(Month_yeah = month(Date)) %>%
+  mutate(Day_of_month = yday(Date)) %>%
+  group_by(site, Day_of_month) %>%
+  summarize(medianQ = median(q)) 
+# one year
+ggplot(data=median_Q) +
+  geom_line(aes(x=Day_of_month, y=medianQ, color = site)) +
+  scale_x_continuous(
+    breaks = seq(1, 365, by = 30.5), # set breaks at the start of each month
+    labels = month.abb # use abbreviated month names for labels
+  ) +
+  labs(x = "Month", y = "Median Daily Streamflow", color = "Site")
+# break into seasons 
+springQ <- combined_sites %>%
+  mutate(month = month(Date)) %>%
+  mutate(day = yday(Date)) %>%
+  filter(month %in% c(3,4,5)) %>%
+  group_by(site, day) %>%
+  summarize(medianQ = median(q)) %>%
+  filter(medianQ < 2000)
+  
+
+ggplot(data = springQ) + 
+  geom_line(aes(x= day, y=medianQ, color = site)) +
+   scale_x_continuous(
+    breaks = seq(60, 151, by = 30.67),
+    labels = (x = c('March','April','May') # set breaks at the start of each month
+  )) +
+   labs(x = "Month", y = "Median Daily Streamflow", color = "Site")
+
+
+summerQ <- combined_sites %>%
+  mutate(month = month(Date)) %>%
+  mutate(day = yday(Date)) %>%
+  filter(month %in% c(6,7,8)) %>%
+  group_by(site, day) %>%
+  summarize(medianQ = median(q)) 
+
+ggplot(data = summerQ) + 
+  geom_line(aes(x= day, y=medianQ, color = site)) +
+   scale_x_continuous(
+    breaks = seq(152, 244, by = 30.67),
+    labels = (x = c('June','July','August') # set breaks at the start of each month
+  )) +
+   labs(x = "Month", y = "Median Daily Streamflow", color = "Site")
+
+fallQ <- combined_sites %>%
+  mutate(month = month(Date)) %>%
+  mutate(day = yday(Date)) %>%
+   filter(month %in% c(9,10,11)) %>%
+  group_by(site, day) %>%
+  summarize(medianQ = median(q)) 
+
+ggplot(data = fallQ) + 
+  geom_line(aes(x= day, y=medianQ, color = site)) +
+   scale_x_continuous(
+    breaks = seq(245, 335, by = 30.33333),
+    labels = (x = c('September','October','November') # set breaks at the start of each month
+  )) +
+   labs(x = "Month", y = "Median Daily Streamflow", color = "Site")
+  #scale_x_continuous(
+    #breaks = seq(1, 92, by = 30.66667), # set breaks at the start of each month
+    
+  #labels = month.abb # use abbreviated month names for labels
+  #) +
+  #labs(x = "Month", y = "Median Daily Streamflow", color = "Site")
+#mutate(Day_of_month = yday(Date)) %>%
+ 
+# group_by(site, Day_of_month) %>%
+```
+
+Now I'm going to make the hydrographs of both sites during the entire water year, then I'll make the regime curves later for the biologically active times. 
+```{r}
+#ggplot(combined_sites, aes(x=Date, y=Streamflow (cfs)))
+# https://stackoverflow.com/questions/9178024/ggplot2-shade-area-between-two-vertical-lines
+```
+
+
+```{r}
+#q_downloader <- function(site = '06752260'){
+ # streamflow_df <- readNWISdv(site_no, 
+                            #  parameterCd = '00060', 
+                            #  startDate = '1990-10-01', 
+                            #  endDate = '2022-10-01') %>%
+ # rename(q = X_00060_00003) %>%
+ # rename(q_cd = X_00060_00003_cd) %>%
+   # return(streamflow_df)
+#} 
+
+#lincoln_Q <- q_downloader(site_no = '06752260')
+#boxelder_Q <- q_downloader(site_no = '06752280')
+  
+  
+```
+
+
+# read pre 2022 data in 
+```{r}
+library(lubridate)
+data_raw <- read.csv('data_raw/all_sensor_data_pre2022.csv')  %>%
+  filter(DO_ppm >0, DO_ppm < 50, Water_Temp_C < 60) %>%
+  mutate(newDO = runmed(DO_ppm,7)) %>%
+  filter(newDO < 20 & newDO > 3)
+cleaner_data <- data_raw %>%
+  pivot_wider(names_from = sensor, values_from = date)
+
+#data_raw$date <- ymd_hms(data_raw$date)
+
+```
+# look at the date with graphs
+Eval = false for things that take forever to run
+
+Dissolved Oxygen
+```{r}
+
+ggplot(data_raw) +
+  geom_line(aes(x=date, y=newDO, color = sensor), na.rm = T) +
+  labs(x = "Month", y = "Dissolved oxygen (ppm)")  
+  a#scale_x_continuous(
+   breaks = seq(1, 365, by = 30.5),  # set breaks at the start of each month
+   labels = month.abb # use abbreviated month names for labels
+ ) 
+
+
+
+DOspring <- data_raw %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(day = yday(date)) %>%
+  filter(month %in% c(3,4,5)) %>%
+  group_by(year, day, sensor) %>%
+  summarize(median_value = median(DO_ppm, na.rm = T))
+
+ggplot(data = DOspring) + 
+  geom_line(aes(x= date, y=median_value, color = sensor)) +
+   scale_x_date(
+    minor_breaks = '1 month') +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site")
+
+SummerDO <- data_raw %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(day = yday(date)) %>%
+  filter(month %in% c(6,7,8)) %>%
+  group_by(sensor, date) 
+ggplot(data = SummerDO) + 
+  geom_line(aes(x= day, y=newDO, color = sensor)) +
+   scale_x_continuous(
+    breaks = seq(153, 243, by = 30.67),
+    labels = (x = c('June','July','August') # set breaks at the start of each month
+  )) +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site")
+
+FallDO <- data_raw %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(day = yday(date)) %>%
+  filter(month %in% c(9,10,11)) %>%
+  group_by(sensor, date) 
+ggplot(data = FallDO) + 
+  geom_line(aes(x= day, y=newDO, color = sensor)) +
+   scale_x_continuous(
+    breaks = seq(270, 334, by = 32),
+    labels = (x = c('September','October','November') # set breaks at the start of each month
+  )) +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site")
+#filter out 100ppm DO first 
+
+# scale_color_discrete() +  # Use discrete color scale
+  #labs(x = "Month", y = "Dissolved oxygen (ppm)")
+# https://stackoverflow.com/questions/9178024/ggplot2-shade-area-between-two-vertical-lines https://chartio.com/learn/charts/area-chart-complete-guide/
+```
+Temperature 
+```{r}
+# clean the data
+
+library(lubridate)
+data_raw <- read.csv('data_raw/all_sensor_data_pre2022.csv')  %>%
+  filter(Water_Temp_C < 60) %>%
+  mutate(newDO = runmed(Water_Temp_C,7)) %>%
+  filter(newDO < 20 & newDO > 3)
+cleaner_data <- data_raw %>%
+  pivot_wider(names_from = sensor, values_from = date)
+# filter our 750 degrees C temperatures
+```
+
+
