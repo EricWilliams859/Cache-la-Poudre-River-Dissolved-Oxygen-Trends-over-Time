@@ -158,13 +158,13 @@ Eval = false for things that take forever to run
 Dissolved Oxygen
 ```{r}
 
-ggplot(data_raw) +
-  geom_line(aes(x=date, y=newDO, color = sensor), na.rm = T) +
-  labs(x = "Month", y = "Dissolved oxygen (ppm)")  
-  a#scale_x_continuous(
-   breaks = seq(1, 365, by = 30.5),  # set breaks at the start of each month
-   labels = month.abb # use abbreviated month names for labels
- ) 
+#ggplot(data_raw) +
+ # geom_line(aes(x=date, y=newDO, color = sensor), na.rm = T) +
+ # labs(x = "Month", y = "Dissolved oxygen (ppm)")  
+ # a#scale_x_continuous(
+ #  breaks = seq(1, 365, by = 30.5),  # set breaks at the start of each month
+  # labels = month.abb # use abbreviated month names for labels
+ #) 
 
 
 
@@ -177,38 +177,47 @@ DOspring <- data_raw %>%
   summarize(median_value = median(DO_ppm, na.rm = T))
 
 ggplot(data = DOspring) + 
-  geom_line(aes(x= date, y=median_value, color = sensor)) +
-   scale_x_date(
-    minor_breaks = '1 month') +
-   labs(x = "Month", y = "Median DO (g/mL)", color = "Site")
+  geom_line(aes(x= day, y=median_value, color = sensor)) +
+   scale_x_continuous(
+    breaks = c(61,92,122),
+    labels = c('March','April','May') # set breaks at the start of each month
+  ) +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site") +
+  facet_grid(year ~.)
 
 SummerDO <- data_raw %>%
   mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
   mutate(month = lubridate::month(date)) %>%
   mutate(day = yday(date)) %>%
   filter(month %in% c(6,7,8)) %>%
-  group_by(sensor, date) 
-ggplot(data = SummerDO) + 
-  geom_line(aes(x= day, y=newDO, color = sensor)) +
-   scale_x_continuous(
-    breaks = seq(153, 243, by = 30.67),
-    labels = (x = c('June','July','August') # set breaks at the start of each month
-  )) +
-   labs(x = "Month", y = "Median DO (g/mL)", color = "Site")
+  group_by(year, day, sensor) %>%
+  summarize(median_value = median(DO_ppm, na.rm = T))
 
-FallDO <- data_raw %>%
+ggplot(data = SummerDO) + 
+  geom_line(aes(x= day, y=median_value, color = sensor)) +
+   scale_x_continuous(
+    breaks = c(152,182,213),
+    labels = c('June','July','August') # set breaks at the start of each month
+  ) +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site") +
+  facet_grid(year ~.)
+
+FallDOgirl <- data_raw %>%
   mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
   mutate(month = lubridate::month(date)) %>%
   mutate(day = yday(date)) %>%
   filter(month %in% c(9,10,11)) %>%
-  group_by(sensor, date) 
-ggplot(data = FallDO) + 
-  geom_line(aes(x= day, y=newDO, color = sensor)) +
+  group_by(year, day, sensor) %>%
+  summarize(median_value = median(DO_ppm, na.rm = T))
+
+ggplot(data = FallDOgirl) + 
+  geom_line(aes(x= day, y=median_value, color = sensor)) +
    scale_x_continuous(
-    breaks = seq(270, 334, by = 32),
-    labels = (x = c('September','October','November') # set breaks at the start of each month
-  )) +
-   labs(x = "Month", y = "Median DO (g/mL)", color = "Site")
+    breaks = c(244,274,305),
+    labels = c('September','October','November') # set breaks at the start of each month
+  ) +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site") +
+  facet_grid(year ~.)
 #filter out 100ppm DO first 
 
 # scale_color_discrete() +  # Use discrete color scale
@@ -220,13 +229,66 @@ Temperature
 # clean the data
 
 library(lubridate)
-data_raw <- read.csv('data_raw/all_sensor_data_pre2022.csv')  %>%
-  filter(Water_Temp_C < 60) %>%
-  mutate(newDO = runmed(Water_Temp_C,7)) %>%
-  filter(newDO < 20 & newDO > 3)
-cleaner_data <- data_raw %>%
-  pivot_wider(names_from = sensor, values_from = date)
+Tspring_slay <- data_raw %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(day = yday(date)) %>%
+  filter(month %in% c(3,4,5)) %>%
+  group_by(year, day, sensor) %>%
+  summarize(median_Tvalue = median(Water_Temp_C, na.rm = T))
+
+HotSummerT <- data_raw %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(day = yday(date)) %>%
+  filter(month %in% c(6,7,8)) %>%
+  group_by(year, day, sensor) %>%
+  summarize(median_Tvalue = median(Water_Temp_C, na.rm = T))
+
+FallTemp_getout <- data_raw %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(day = yday(date)) %>%
+  filter(month %in% c(9,10,11)) %>%
+  group_by(year, day, sensor) %>%
+  summarize(median_Tvalue = median(Water_Temp_C, na.rm = T))
+
 # filter our 750 degrees C temperatures
 ```
 
+Graph the T data 
+```{r}
+#spring T graphed
+ggplot(data = Tspring_slay) + 
+  geom_line(aes(x= day, y=median_Tvalue, color = sensor)) +
+   scale_x_continuous(
+    breaks = c(61,92,122),
+    labels = c('March','April','May') # set breaks at the start of each month
+  ) +
+   labs(x = "Month", y = "Median water Temperature (degrees Celsius)", color = "Site") +
+  facet_grid(year ~.)
+#summer T graphed
+ggplot(data = HotSummerT) + 
+  geom_line(aes(x= day, y=median_Tvalue, color = sensor)) +
+   scale_x_continuous(
+    breaks = c(152,182,213),
+    labels = c('June','July','August') # set breaks at the start of each month
+  ) +
+   labs(x = "Month", y = "Median Water Temperature (degrees Celsius)", color = "Site") +
+  facet_grid(year ~.)
+# Fall T graphed
+ggplot(data = FallTemp_getout) + 
+  geom_line(aes(x= day, y=median_Tvalue, color = sensor)) +
+   scale_x_continuous(
+    breaks = c(244,274,305),
+    labels = c('September','October','November') # set breaks at the start of each month
+  ) +
+   labs(x = "Month", y = "Median DO (g/mL)", color = "Site") +
+  facet_grid(year ~.)
+
+# lookm at ggthemes for final submission
+#plot +
+#theme_bw() +
+#scale_color_colorblind()
+```
 
